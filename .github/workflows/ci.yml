@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  code-quality: write
 
 env:
   GOTOOLCHAIN: local
@@ -52,6 +53,26 @@ jobs:
 
       - name: Run platform source quality
         run: go run -mod=readonly ./cmd/build
+
+      - name: Generate Cobertura coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+          go run -mod=readonly ./cmd/coverage-cobertura \
+            --input coverage.out \
+            --output coverage.xml \
+            --module github.com/CyberT33N/credential-broker-platform
+
+      - name: Upload GitHub code coverage
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-code-coverage@1c15be36fc3733ba839b1dd643bd9556e4426dc1 # v1
+        with:
+          file: coverage.xml
+          language: Go
+          label: code-coverage/go
+          fail-on-error: "true"
+          wait-for-processing-timeout: "160"
 
       - name: Fuzz configuration boundary
         run: go test -mod=readonly ./internal/config -run=^$ -fuzz=FuzzParseRepository -fuzztime=5000x -parallel=1

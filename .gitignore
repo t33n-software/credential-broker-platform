@@ -4,6 +4,7 @@
 *.key
 *.crt
 coverage.out
+coverage.xml
 bin/
 .build/
 dist/

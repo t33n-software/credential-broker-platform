@@ -90,6 +90,14 @@ The build command enforces formatting, module integrity, read-only module
 metadata, tests, exact statement coverage, race detection, static analysis,
 Linux/AMD64 compilation, and embedded module provenance.
 
+## GitHub governance
+
+The importable platform-specific GitHub Ruleset JSON and its activation
+prerequisites are documented in
+[`docs/hosting-platforms/github/rulesets`](docs/hosting-platforms/github/rulesets/README.md).
+CI generates Cobertura XML through `cmd/coverage-cobertura` and uploads it to
+GitHub Code Coverage before the 100% GitHub-native coverage rule is activated.
+
 ## Container input
 
 `Dockerfile` accepts only an explicit `BUILDER_IMAGE` argument. The value must
