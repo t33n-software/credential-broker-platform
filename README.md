@@ -95,8 +95,6 @@ Linux/AMD64 compilation, and embedded module provenance.
 The importable platform-specific GitHub Ruleset JSON and its activation
 prerequisites are documented in
 [`docs/hosting-platforms/github/rulesets`](docs/hosting-platforms/github/rulesets/README.md).
-CI generates Cobertura XML through `cmd/coverage-cobertura` and uploads it to
-GitHub Code Coverage before the 100% GitHub-native coverage rule is activated.
 
 ## Container input
 

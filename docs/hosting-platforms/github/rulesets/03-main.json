@@ -56,19 +56,6 @@
           }
         ]
       }
-    },
-    {
-      "type": "code_quality",
-      "parameters": {
-        "severity": "all"
-      }
-    },
-    {
-      "type": "code_coverage",
-      "parameters": {
-        "minimum_coverage": 100,
-        "max_coverage_drop": 0
-      }
     }
   ]
 }

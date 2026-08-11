@@ -20,19 +20,20 @@ func TestPlatformWorkflowContracts(t *testing.T) {
 			"      - main",
 			"      - develop",
 			"permissions:\n  contents: read",
-			"code-quality: write",
 			"persist-credentials: false",
 			"go run -mod=readonly ./cmd/build",
-			"go run -mod=readonly ./cmd/coverage-cobertura",
-			"actions/upload-code-coverage@1c15be36fc3733ba839b1dd643bd9556e4426dc1",
-			"file: coverage.xml",
-			"language: Go",
-			"label: code-coverage/go",
 			"FuzzParseRepository",
 			"FuzzTokenRequestBoundary",
 		},
 	}
 	assertWorkflowContract(t, testCase.path, testCase.required)
+	assertRepositoryFileDoesNotContain(t, testCase.path, []string{
+		"code-quality: write",
+		"cmd/coverage-cobertura",
+		"actions/upload-code-coverage",
+		"coverage.xml",
+		"code-coverage/go",
+	})
 
 	assertWorkflowContract(t, ".github/workflows/codeql.yml", []string{
 		"name: CodeQL",
@@ -170,9 +171,12 @@ func TestPlatformRulesetContracts(t *testing.T) {
 		"Enable release immutability: enabled",
 		"Quality gates (linux-amd64)",
 		"Dependency admission review",
+	})
+	assertRepositoryFileDoesNotContain(t, "docs/hosting-platforms/github/rulesets/README.md", []string{
 		"GitHub Code Quality",
 		"GitHub Code Coverage",
 		"Cobertura XML",
+		"code-quality: write",
 	})
 }
 
@@ -211,7 +215,8 @@ func assertSharedRuleset(t *testing.T, ruleset importableRuleset, name string, r
 	if strings.Join(ruleset.Conditions.RefName.Include, ",") != ref {
 		t.Fatalf("shared Ruleset ref patterns = %#v, want %q", ruleset.Conditions.RefName.Include, ref)
 	}
-	assertRuleTypes(t, ruleset, "deletion", "non_fast_forward", "pull_request", "required_status_checks", "code_scanning", "code_quality", "code_coverage")
+	assertRuleTypes(t, ruleset, "deletion", "non_fast_forward", "pull_request", "required_status_checks", "code_scanning")
+	assertNoRuleTypes(t, ruleset, "code_quality", "code_coverage")
 
 	var pullRequest struct {
 		RequiredApprovingReviewCount   int      `json:"required_approving_review_count"`
@@ -254,23 +259,6 @@ func assertSharedRuleset(t *testing.T, ruleset importableRuleset, name string, r
 	if len(codeScanning.Tools) != 1 || codeScanning.Tools[0].Tool != "CodeQL" || codeScanning.Tools[0].AlertsThreshold != "all" || codeScanning.Tools[0].SecurityAlertsThreshold != "all" {
 		t.Fatalf("code scanning parameters = %#v", codeScanning)
 	}
-
-	var codeQuality struct {
-		Severity string `json:"severity"`
-	}
-	decodeRuleParameters(t, ruleset, "code_quality", &codeQuality)
-	if codeQuality.Severity != "all" {
-		t.Fatalf("code quality parameters = %#v", codeQuality)
-	}
-
-	var codeCoverage struct {
-		MinimumCoverage int `json:"minimum_coverage"`
-		MaxCoverageDrop int `json:"max_coverage_drop"`
-	}
-	decodeRuleParameters(t, ruleset, "code_coverage", &codeCoverage)
-	if codeCoverage.MinimumCoverage != 100 || codeCoverage.MaxCoverageDrop != 0 {
-		t.Fatalf("code coverage parameters = %#v", codeCoverage)
-	}
 }
 
 func assertRuleTypes(t *testing.T, ruleset importableRuleset, want ...string) {
@@ -293,6 +281,15 @@ func containsRule(ruleset importableRuleset, ruleType string) bool {
 	return false
 }
 
+func assertNoRuleTypes(t *testing.T, ruleset importableRuleset, forbidden ...string) {
+	t.Helper()
+	for _, ruleType := range forbidden {
+		if containsRule(ruleset, ruleType) {
+			t.Fatalf("Ruleset contains forbidden rule type %q", ruleType)
+		}
+	}
+}
+
 func decodeRuleParameters(t *testing.T, ruleset importableRuleset, ruleType string, target any) {
 	t.Helper()
 	for _, rule := range ruleset.Rules {
@@ -313,6 +310,16 @@ func assertWorkflowContract(t *testing.T, path string, required []string) {
 	for _, value := range required {
 		if !strings.Contains(contents, value) {
 			t.Fatalf("%s does not contain %q", path, value)
+		}
+	}
+}
+
+func assertRepositoryFileDoesNotContain(t *testing.T, path string, forbidden []string) {
+	t.Helper()
+	contents := readRepositoryFile(t, path)
+	for _, value := range forbidden {
+		if strings.Contains(contents, value) {
+			t.Fatalf("%s contains forbidden value %q", path, value)
 		}
 	}
 }

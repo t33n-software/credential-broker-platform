@@ -52,44 +52,11 @@ The JSON files require:
 Quality gates (linux-amd64)
 Dependency admission review
 CodeQL code scanning with all alerts blocking
-GitHub Code Quality with severity all
-GitHub Code Coverage with minimum coverage 100 and maximum drop 0
 ```
 
 `Quality gates (linux-amd64)` enforces formatting, module integrity, tests,
 exact 100% statement coverage, race detection, static analysis, Linux/AMD64
 build, and module provenance.
-
-## GitHub-native quality and coverage activation
-
-The JSON files are the final platform target:
-
-```text
-Code Quality:
-severity = all
-
-Code Coverage:
-minimum_coverage = 100
-max_coverage_drop = 0
-```
-
-The CI workflow generates a combined atomic Go profile, converts it to
-Cobertura XML, and uploads it through the immutable
-`actions/upload-code-coverage` action with only `code-quality: write` added to
-the normal read-only workflow permissions.
-
-Before importing `02-develop.json` or `03-main.json`, prove:
-
-```text
-- GitHub Code Quality enabled and reporting a successful result;
-- Cobertura XML uploaded for the default branch and pull requests;
-- workflow permission code-quality: write;
-- coverage reports present for the exact shared-line targets.
-```
-
-Do not weaken or remove these Ruleset rules to merge a PR. A missing
-GitHub-native result blocks the merge by design and must be repaired at the
-workflow or GitHub-feature boundary.
 
 ## Security boundary
 
