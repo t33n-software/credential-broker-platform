@@ -1,0 +1,5 @@
+pre-push:
+  parallel: false
+  commands:
+    platform-source-quality:
+      run: go run -mod=readonly ./cmd/build
