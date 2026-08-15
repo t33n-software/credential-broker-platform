@@ -11,9 +11,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/CyberT33N/credential-broker-platform/internal/broker"
-	"github.com/CyberT33N/credential-broker-platform/internal/config"
-	"github.com/CyberT33N/credential-broker-platform/internal/githubapp"
+	"github.com/t33n-software/credential-broker-platform/internal/broker"
+	"github.com/t33n-software/credential-broker-platform/internal/config"
+	"github.com/t33n-software/credential-broker-platform/internal/githubapp"
 )
 
 const shutdownTimeout = 10 * time.Second
