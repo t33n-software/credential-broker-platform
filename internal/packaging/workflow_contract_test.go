@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -60,7 +62,7 @@ func TestPlatformWorkflowContracts(t *testing.T) {
 	} {
 		contents := readRepositoryFile(t, path)
 		for _, forbidden := range []string{
-			"CyberT33N/git-governance",
+			"t33n-software/git-governance",
 			"git-governance-release-broker",
 			"GCP_",
 			"BROKER_APP_ID",
@@ -178,6 +180,98 @@ func TestPlatformRulesetContracts(t *testing.T) {
 		"Cobertura XML",
 		"code-quality: write",
 	})
+}
+
+func TestRulesetSourcesAreCompleteAndPortable(t *testing.T) {
+	rulesetDirectory := filepath.Join("..", "..", "docs", "hosting-platforms", "github", "rulesets")
+	entries, err := os.ReadDir(rulesetDirectory)
+	if err != nil {
+		t.Fatalf("ReadDir(%q) error = %v", rulesetDirectory, err)
+	}
+
+	jsonNames := make([]string, 0)
+	for _, entry := range entries {
+		if filepath.Ext(entry.Name()) == ".json" {
+			jsonNames = append(jsonNames, entry.Name())
+		}
+	}
+	sort.Strings(jsonNames)
+	wantNames := []string{
+		"00-push-protections.json",
+		"01-ticket-working-branches.json",
+		"02-develop.json",
+		"03-main.json",
+	}
+	if !reflect.DeepEqual(jsonNames, wantNames) {
+		t.Fatalf("ruleset JSON files = %#v, want %#v", jsonNames, wantNames)
+	}
+
+	for _, name := range jsonNames {
+		content := readRepositoryFile(t, filepath.Join("docs", "hosting-platforms", "github", "rulesets", name))
+		for _, forbidden := range []string{"code_quality", "code_coverage"} {
+			if strings.Contains(content, forbidden) {
+				t.Fatalf("%s contains unsupported %q", name, forbidden)
+			}
+		}
+		if !strings.Contains(content, "\"bypass_actors\": []") {
+			t.Fatalf("%s does not prohibit Ruleset bypass actors", name)
+		}
+	}
+}
+
+func TestPushProtectionsRulesetBlocksCredentialShapedArtifacts(t *testing.T) {
+	push := readRepositoryFile(t, "docs/hosting-platforms/github/rulesets/00-push-protections.json")
+	for _, required := range []string{
+		"\"name\": \"push-protections: block secret and key shaped artifacts\"",
+		"\"target\": \"push\"",
+		"\"source\": \"t33n-software/credential-broker-platform\"",
+		"\"enforcement\": \"active\"",
+		"\"conditions\": null",
+		"\"bypass_actors\": []",
+		"file_extension_restriction",
+		"restricted_file_extensions",
+		"file_path_restriction",
+		"restricted_file_paths",
+	} {
+		if !strings.Contains(push, required) {
+			t.Fatalf("00-push-protections.json does not contain %q", required)
+		}
+	}
+	for _, extension := range []string{"pem", "key", "p12", "pfx", "jks", "keystore", "kdbx", "ppk", "gpg"} {
+		if !strings.Contains(push, "\"*."+extension+"\"") {
+			t.Fatalf("00-push-protections.json does not restrict the %q extension in glob form", extension)
+		}
+	}
+	for _, path := range []string{"**/.env", "**/.env.*", "**/credentials", "**/credentials.*", "**/*.tfstate", "**/*.tfstate.*"} {
+		if !strings.Contains(push, "\""+path+"\"") {
+			t.Fatalf("00-push-protections.json does not restrict the %q path", path)
+		}
+	}
+	for _, forbidden := range []string{"ref_name", "required_status_checks", "code_scanning", "code_quality", "code_coverage"} {
+		if strings.Contains(push, forbidden) {
+			t.Fatalf("00-push-protections.json unexpectedly contains %q; a push ruleset has no branch targets or check bindings", forbidden)
+		}
+	}
+
+	readme := normalizeWhitespace(readRepositoryFile(t, "docs/hosting-platforms/github/rulesets/README.md"))
+	for _, required := range []string{"00-push-protections.json", "fork network", "Team plan", "public"} {
+		if !strings.Contains(readme, required) {
+			t.Fatalf("Ruleset README does not document the push protections token %q", required)
+		}
+	}
+}
+
+func TestModuleIdentityMatchesOrganizationNamespace(t *testing.T) {
+	goMod := readRepositoryFile(t, "go.mod")
+	for _, required := range []string{
+		"module github.com/t33n-software/credential-broker-platform",
+		"go 1.26",
+		"toolchain go1.26.5",
+	} {
+		if !strings.Contains(goMod, required) {
+			t.Fatalf("go.mod does not contain %q", required)
+		}
+	}
 }
 
 type importableRuleset struct {
@@ -322,6 +416,10 @@ func assertRepositoryFileDoesNotContain(t *testing.T, path string, forbidden []s
 			t.Fatalf("%s contains forbidden value %q", path, value)
 		}
 	}
+}
+
+func normalizeWhitespace(content string) string {
+	return strings.Join(strings.Fields(content), " ")
 }
 
 func readRepositoryFile(t *testing.T, path string) string {

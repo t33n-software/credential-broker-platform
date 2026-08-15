@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CyberT33N/credential-broker-platform/internal/config"
-	"github.com/CyberT33N/credential-broker-platform/internal/githubapp"
+	"github.com/t33n-software/credential-broker-platform/internal/config"
+	"github.com/t33n-software/credential-broker-platform/internal/githubapp"
 )
 
 type issuerFunc func(context.Context, string) (githubapp.Token, error)

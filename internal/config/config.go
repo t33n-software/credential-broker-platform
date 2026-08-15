@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CyberT33N/credential-broker-platform/internal/githubapp"
+	"github.com/t33n-software/credential-broker-platform/internal/githubapp"
 )
 
 const (

@@ -1,4 +1,4 @@
-module github.com/CyberT33N/credential-broker-platform
+module github.com/t33n-software/credential-broker-platform
 
 go 1.26
 

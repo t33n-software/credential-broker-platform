@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/CyberT33N/credential-broker-platform/internal/app"
+	"github.com/t33n-software/credential-broker-platform/internal/app"
 )
 
 var run = app.Run
