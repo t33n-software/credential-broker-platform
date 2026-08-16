@@ -16,13 +16,28 @@ The controlled build command verifies:
 Go formatting
 go mod verify
 go mod tidy -diff
+tools module download, verify, and tidy -diff
+staticcheck lint
 go test -mod=readonly ./...
 100% statement coverage
 go test -race
 go vet
+govulncheck fail-closed vulnerability analysis
+configuration and HTTP boundary fuzz lanes
+Lefthook configuration validation
 Linux AMD64 broker build
 embedded module provenance
 ```
+
+The Go toolchain is pinned exactly (`toolchain go1.26.6`,
+`GOTOOLCHAIN=local`); no lane downloads a toolchain at build time. Build tools
+(`govulncheck`, `staticcheck`, `lefthook`) live in the separate pinned
+`tools/` module with its own verified `go.mod` and committed `go.sum`; they
+never join the source module graph. CI re-runs the full gate on a daily
+schedule so newly disclosed vulnerabilities in the pinned toolchain or
+dependency graph fail closed even without source changes. Lefthook provides
+the local `commit-msg` hook (governed commit-message validation) and the
+pre-push source-quality gate.
 
 Local verification must not use production GitHub App private keys, Cloud Run
 invoker identities, deployment credentials, or a mutable production service.
@@ -46,7 +61,7 @@ tenant-neutral platform-delivery authority provisions them:
 
 ```text
 approved internal Go proxy
-separately issued and evidence-verified internal Go 1.26.5 builder artifact
+separately issued and evidence-verified internal Go 1.26.6 builder artifact
 platform artifact and evidence registries for SBOM, provenance, signatures,
 attestations, promotion, and deployment evidence
 ```

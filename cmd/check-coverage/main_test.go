@@ -70,7 +70,7 @@ func TestRun(t *testing.T) {
 
 func TestRunUsesBackgroundContextForNil(t *testing.T) {
 	var received context.Context
-	code := run(nil, nil, &bytes.Buffer{}, &bytes.Buffer{}, func(ctx context.Context, executable string, arguments ...string) ([]byte, error) {
+	code := run(testNilContext(), nil, &bytes.Buffer{}, &bytes.Buffer{}, func(ctx context.Context, executable string, arguments ...string) ([]byte, error) {
 		received = ctx
 		if executable != "go" || strings.Join(arguments, " ") != "test -count=1 -cover ./..." {
 			t.Fatalf("command = %s %v", executable, arguments)
@@ -80,6 +80,10 @@ func TestRunUsesBackgroundContextForNil(t *testing.T) {
 	if code != 0 || received == nil {
 		t.Fatalf("run() = %d, context = %v", code, received)
 	}
+}
+
+func testNilContext() context.Context {
+	return nil
 }
 
 func TestOutputParsersAndRunGoCommand(t *testing.T) {
