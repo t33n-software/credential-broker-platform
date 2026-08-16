@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -101,7 +102,7 @@ func TestRun(t *testing.T) {
 			locate:     goFiles,
 			makeDir:    func(string, os.FileMode) error { return errors.New("directory") },
 			wantCode:   1,
-			wantStdout: "==> check Go formatting\n==> verify module checksums\n==> verify module metadata\n==> run unit tests\n==> enforce complete statement coverage\n==> run race detector\n==> run static analysis\n",
+			wantStdout: "==> check Go formatting\n==> verify module checksums\n==> verify module metadata\n==> download build tool dependencies\n==> verify build tool dependencies\n==> verify build tool metadata\n==> run lint\n==> run unit tests\n==> enforce complete statement coverage\n==> run race detector\n==> run static analysis\n==> run vulnerability analysis\n==> fuzz repository parser\n==> fuzz token request boundary\n==> validate Lefthook configuration\n",
 			wantStderr: "create build directory: directory\n",
 		},
 		{
@@ -115,7 +116,7 @@ func TestRun(t *testing.T) {
 			locate:     goFiles,
 			makeDir:    noopDirectory,
 			wantCode:   1,
-			wantStdout: "==> check Go formatting\n==> verify module checksums\n==> verify module metadata\n==> run unit tests\n==> enforce complete statement coverage\n==> run race detector\n==> run static analysis\n==> build Linux AMD64 credential broker\nbuild output",
+			wantStdout: "==> check Go formatting\n==> verify module checksums\n==> verify module metadata\n==> download build tool dependencies\n==> verify build tool dependencies\n==> verify build tool metadata\n==> run lint\n==> run unit tests\n==> enforce complete statement coverage\n==> run race detector\n==> run static analysis\n==> run vulnerability analysis\n==> fuzz repository parser\n==> fuzz token request boundary\n==> validate Lefthook configuration\n==> build Linux AMD64 credential broker\nbuild output",
 			wantStderr: "build Linux AMD64 credential broker: build\n",
 		},
 		{
@@ -124,7 +125,7 @@ func TestRun(t *testing.T) {
 			locate:     goFiles,
 			makeDir:    noopDirectory,
 			wantCode:   0,
-			wantStdout: "==> check Go formatting\n==> verify module checksums\n==> verify module metadata\n==> run unit tests\n==> enforce complete statement coverage\n==> run race detector\n==> run static analysis\n==> build Linux AMD64 credential broker\n==> record Linux credential broker module provenance\nCredential broker platform source-level build completed successfully.\n",
+			wantStdout: "==> check Go formatting\n==> verify module checksums\n==> verify module metadata\n==> download build tool dependencies\n==> verify build tool dependencies\n==> verify build tool metadata\n==> run lint\n==> run unit tests\n==> enforce complete statement coverage\n==> run race detector\n==> run static analysis\n==> run vulnerability analysis\n==> fuzz repository parser\n==> fuzz token request boundary\n==> validate Lefthook configuration\n==> build Linux AMD64 credential broker\n==> record Linux credential broker module provenance\nCredential broker platform source-level build completed successfully.\n",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -157,7 +158,7 @@ func TestRunUsesBackgroundContextAndLinuxTarget(t *testing.T) {
 		receivedContext context.Context
 		receivedEnv     []string
 	)
-	code := run(nil, nil, &bytes.Buffer{}, &bytes.Buffer{}, func(ctx context.Context, environment []string, executable string, arguments ...string) ([]byte, error) {
+	code := run(testNilContext(), nil, &bytes.Buffer{}, &bytes.Buffer{}, func(ctx context.Context, environment []string, executable string, arguments ...string) ([]byte, error) {
 		receivedContext = ctx
 		if executable == "go" && len(arguments) > 0 && arguments[0] == "build" {
 			receivedEnv = environment
@@ -178,8 +179,60 @@ func TestRunUsesBackgroundContextAndLinuxTarget(t *testing.T) {
 	}
 }
 
+func testNilContext() context.Context {
+	return nil
+}
+
+func TestRunSuccessOrdersSecurityAndFuzzGates(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	executed := make([]string, 0)
+	recorder := func(_ context.Context, _ []string, executable string, arguments ...string) ([]byte, error) {
+		executed = append(executed, executable+" "+strings.Join(arguments, " "))
+		return nil, nil
+	}
+	code := run(context.Background(), nil, &stdout, &stderr,
+		recorder,
+		func(string) ([]string, error) { return []string{"a.go"}, nil },
+		func(string) ([]byte, error) { return []byte("package main\n"), nil },
+		func(source []byte) ([]byte, error) { return source, nil },
+		func(string, os.FileMode) error { return nil })
+	if code != 0 {
+		t.Fatalf("run() = %d, want 0; stderr = %q", code, stderr.String())
+	}
+
+	orderedSteps := []string{
+		"go mod verify",
+		"go mod tidy -diff",
+		"go -C tools mod download",
+		"go -C tools mod verify",
+		"go -C tools mod tidy -diff",
+		"go tool -modfile tools/go.mod staticcheck ./...",
+		"go test -mod=readonly ./...",
+		"go run -mod=readonly ./cmd/check-coverage",
+		"go test -mod=readonly -race ./...",
+		"go vet ./...",
+		"go tool -modfile tools/go.mod govulncheck ./...",
+		"go test -mod=readonly ./internal/config -run=^$ -fuzz=FuzzParseRepository -fuzztime=50000x -parallel=1",
+		"go test -mod=readonly ./internal/broker -run=^$ -fuzz=FuzzTokenRequestBoundary -fuzztime=50000x -parallel=1",
+		"go tool -modfile tools/go.mod lefthook validate",
+		"go build -mod=readonly -trimpath -o " + linuxBrokerPath + " ./cmd/broker",
+		"go version -m " + linuxBrokerPath,
+	}
+	previous := -1
+	for _, expected := range orderedSteps {
+		index := slices.Index(executed, expected)
+		if index < 0 {
+			t.Fatalf("executed steps do not contain %q:\n%s", expected, strings.Join(executed, "\n"))
+		}
+		if index < previous {
+			t.Fatalf("step %q executed at position %d, after position %d; want increasing order", expected, index, previous)
+		}
+		previous = index
+	}
+}
+
 func TestStepsAndFormatting(t *testing.T) {
-	if len(sourceQualitySteps()) != 6 {
+	if len(sourceQualitySteps()) != 14 {
 		t.Fatalf("sourceQualitySteps() length = %d", len(sourceQualitySteps()))
 	}
 	if got := linuxBuildSteps(); len(got) != 2 || got[0].arguments[4] != linuxBrokerPath {

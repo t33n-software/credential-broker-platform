@@ -87,8 +87,16 @@ go run -mod=readonly ./cmd/check-coverage
 ```
 
 The build command enforces formatting, module integrity, read-only module
-metadata, tests, exact statement coverage, race detection, static analysis,
-Linux/AMD64 compilation, and embedded module provenance.
+metadata, the pinned build tool module, lint (staticcheck), tests, exact
+statement coverage, race detection, static analysis, fail-closed
+vulnerability analysis (govulncheck), the configuration and HTTP boundary
+fuzz lanes, Lefthook configuration validation, Linux/AMD64 compilation, and
+embedded module provenance.
+
+The Go toolchain is pinned exactly (`toolchain go1.26.6`,
+`GOTOOLCHAIN=local`); no lane downloads a toolchain at build time. Build tools
+live in the pinned `tools/` module. CI re-runs the full gate daily so newly
+disclosed vulnerabilities fail closed even without source changes.
 
 ## GitHub governance
 

@@ -49,6 +49,10 @@ func (listener *testListener) Close() error {
 }
 func (listener *testListener) Addr() net.Addr { return &net.TCPAddr{} }
 
+func testNilContext() context.Context {
+	return nil
+}
+
 func TestRunValidatesAndHandlesServerOutcomes(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	handler := http.NotFoundHandler()
@@ -56,7 +60,7 @@ func TestRunValidatesAndHandlesServerOutcomes(t *testing.T) {
 	listener := &testListener{}
 	listen := func(string, string) (net.Listener, error) { return listener, nil }
 
-	if err := run(nil, logger, build, listen, func(string, http.Handler) httpServer {
+	if err := run(testNilContext(), logger, build, listen, func(string, http.Handler) httpServer {
 		return testServer{}
 	}); err == nil {
 		t.Fatal("run(nil) error = nil")

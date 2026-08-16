@@ -218,6 +218,10 @@ func TestMintRequestsRepositoryBoundInstallationToken(t *testing.T) {
 	}
 }
 
+func testNilContext() context.Context {
+	return nil
+}
+
 func TestMintRejectsInvalidInputsAndResponses(t *testing.T) {
 	key := testPrivateKey(t)
 	now := time.Date(2026, time.July, 19, 1, 0, 0, 0, time.UTC)
@@ -231,7 +235,7 @@ func TestMintRejectsInvalidInputsAndResponses(t *testing.T) {
 			t.Errorf("Mint(%q) error = nil", repository)
 		}
 	}
-	if _, err := client.Mint(nil, "repository"); err == nil {
+	if _, err := client.Mint(testNilContext(), "repository"); err == nil {
 		t.Fatal("Mint(nil) error = nil")
 	}
 	client.profile = CredentialProfile("untrusted")
