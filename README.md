@@ -100,9 +100,9 @@ disclosed vulnerabilities fail closed even without source changes.
 
 ## GitHub governance
 
-The importable platform-specific GitHub Ruleset JSON and its activation
-prerequisites are documented in
-[`docs/hosting-platforms/github/rulesets`](docs/hosting-platforms/github/rulesets/README.md).
+Branch governance is bound through the organization-level rule-sets; the
+canonical source and the rule-set family of this repository are documented in
+[`docs/conventions/hosting-plattform/github/rule-sets`](docs/conventions/hosting-plattform/github/rule-sets/README.md).
 
 ## Container input
 
