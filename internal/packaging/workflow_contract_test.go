@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
-	"sort"
 	"strings"
 	"testing"
 )
@@ -140,123 +138,19 @@ func TestLocalFortressContracts(t *testing.T) {
 	})
 }
 
-func TestPlatformRulesetContracts(t *testing.T) {
-	ticket := loadRuleset(t, "docs/hosting-platforms/github/rulesets/01-ticket-working-branches.json")
-	if ticket.Name != "credential-broker-platform: official ticket and hotfix working branches" {
-		t.Fatalf("ticket Ruleset name = %q", ticket.Name)
-	}
-	if ticket.Target != "branch" || ticket.Enforcement != "active" || len(ticket.BypassActors) != 0 {
-		t.Fatalf("ticket Ruleset boundary = %#v", ticket)
-	}
-	if strings.Join(ticket.Conditions.RefName.Include, ",") != strings.Join([]string{
-		"refs/heads/feature/*",
-		"refs/heads/fix/*",
-		"refs/heads/docs/*",
-		"refs/heads/refactor/*",
-		"refs/heads/chore/*",
-		"refs/heads/test/*",
-		"refs/heads/perf/*",
-		"refs/heads/hotfix/*",
-	}, ",") {
-		t.Fatalf("ticket Ruleset branch patterns = %#v", ticket.Conditions.RefName.Include)
-	}
-	assertRuleTypes(t, ticket, "non_fast_forward")
-
-	develop := loadRuleset(t, "docs/hosting-platforms/github/rulesets/02-develop.json")
-	assertSharedRuleset(t, develop, "credential-broker-platform: develop shared line", "refs/heads/develop", []string{"merge", "rebase", "squash"})
-
-	main := loadRuleset(t, "docs/hosting-platforms/github/rulesets/03-main.json")
-	assertSharedRuleset(t, main, "credential-broker-platform: main shared line", "refs/heads/main", []string{"merge"})
-
-	assertWorkflowContract(t, "docs/hosting-platforms/github/rulesets/README.md", []string{
-		"Always suggest updating pull request branches: disabled",
-		"Enable release immutability: enabled",
-		"Quality gates (linux-amd64)",
-		"Dependency admission review",
-	})
-	assertRepositoryFileDoesNotContain(t, "docs/hosting-platforms/github/rulesets/README.md", []string{
-		"GitHub Code Quality",
-		"GitHub Code Coverage",
-		"Cobertura XML",
-		"code-quality: write",
-	})
-}
-
-func TestRulesetSourcesAreCompleteAndPortable(t *testing.T) {
-	rulesetDirectory := filepath.Join("..", "..", "docs", "hosting-platforms", "github", "rulesets")
-	entries, err := os.ReadDir(rulesetDirectory)
-	if err != nil {
-		t.Fatalf("ReadDir(%q) error = %v", rulesetDirectory, err)
+func TestOrganizationRulesetAdoptionHasNoLocalLegacyDefinitions(t *testing.T) {
+	if _, err := os.Stat(filepath.Join("..", "..", "docs", "hosting-platforms")); !os.IsNotExist(err) {
+		t.Fatalf("legacy ruleset location must not exist")
 	}
 
-	jsonNames := make([]string, 0)
-	for _, entry := range entries {
-		if filepath.Ext(entry.Name()) == ".json" {
-			jsonNames = append(jsonNames, entry.Name())
-		}
-	}
-	sort.Strings(jsonNames)
-	wantNames := []string{
-		"00-push-protections.json",
-		"01-ticket-working-branches.json",
-		"02-develop.json",
-		"03-main.json",
-	}
-	if !reflect.DeepEqual(jsonNames, wantNames) {
-		t.Fatalf("ruleset JSON files = %#v, want %#v", jsonNames, wantNames)
-	}
-
-	for _, name := range jsonNames {
-		content := readRepositoryFile(t, filepath.Join("docs", "hosting-platforms", "github", "rulesets", name))
-		for _, forbidden := range []string{"code_quality", "code_coverage"} {
-			if strings.Contains(content, forbidden) {
-				t.Fatalf("%s contains unsupported %q", name, forbidden)
-			}
-		}
-		if !strings.Contains(content, "\"bypass_actors\": []") {
-			t.Fatalf("%s does not prohibit Ruleset bypass actors", name)
-		}
-	}
-}
-
-func TestPushProtectionsRulesetBlocksCredentialShapedArtifacts(t *testing.T) {
-	push := readRepositoryFile(t, "docs/hosting-platforms/github/rulesets/00-push-protections.json")
+	conventions := readRepositoryFile(t, "docs/conventions/hosting-plattform/github/rule-sets/README.md")
 	for _, required := range []string{
-		"\"name\": \"push-protections: block secret and key shaped artifacts\"",
-		"\"target\": \"push\"",
-		"\"source\": \"t33n-software/credential-broker-platform\"",
-		"\"enforcement\": \"active\"",
-		"\"conditions\": null",
-		"\"bypass_actors\": []",
-		"file_extension_restriction",
-		"restricted_file_extensions",
-		"file_path_restriction",
-		"restricted_file_paths",
+		"git-governance",
+		"quality-gates=linux-only",
+		"~ALL",
 	} {
-		if !strings.Contains(push, required) {
-			t.Fatalf("00-push-protections.json does not contain %q", required)
-		}
-	}
-	for _, extension := range []string{"pem", "key", "p12", "pfx", "jks", "keystore", "kdbx", "ppk", "gpg"} {
-		if !strings.Contains(push, "\"*."+extension+"\"") {
-			t.Fatalf("00-push-protections.json does not restrict the %q extension in glob form", extension)
-		}
-	}
-	for _, path := range []string{"**/.env", "**/.env.*", "**/credentials", "**/credentials.*", "**/*.tfstate", "**/*.tfstate.*"} {
-		if !strings.Contains(push, "\""+path+"\"") {
-			t.Fatalf("00-push-protections.json does not restrict the %q path", path)
-		}
-	}
-	for _, forbidden := range []string{"ref_name", "required_status_checks", "code_scanning", "code_quality", "code_coverage"} {
-		if strings.Contains(push, forbidden) {
-			t.Fatalf("00-push-protections.json unexpectedly contains %q; a push ruleset has no branch targets or check bindings", forbidden)
-		}
-	}
-
-	readme := normalizeWhitespace(readRepositoryFile(t, "docs/hosting-platforms/github/rulesets/README.md"))
-	for _, required := range []string{"00-push-protections.json", "fork network", "Team plan", "public"} {
-		if !strings.Contains(readme, required) {
-			t.Fatalf("Ruleset README does not document the push protections token %q", required)
+		if !strings.Contains(conventions, required) {
+			t.Fatalf("rule-set conventions README does not contain %q", required)
 		}
 	}
 }
@@ -331,130 +225,6 @@ func TestGoToolchainAndBuildToolingContract(t *testing.T) {
 	}
 }
 
-type importableRuleset struct {
-	Name         string            `json:"name"`
-	Target       string            `json:"target"`
-	Enforcement  string            `json:"enforcement"`
-	BypassActors []json.RawMessage `json:"bypass_actors"`
-	Conditions   struct {
-		RefName struct {
-			Include []string `json:"include"`
-		} `json:"ref_name"`
-	} `json:"conditions"`
-	Rules []rulesetRule `json:"rules"`
-}
-
-type rulesetRule struct {
-	Type       string          `json:"type"`
-	Parameters json.RawMessage `json:"parameters"`
-}
-
-func loadRuleset(t *testing.T, path string) importableRuleset {
-	t.Helper()
-	var ruleset importableRuleset
-	if err := json.Unmarshal([]byte(readRepositoryFile(t, path)), &ruleset); err != nil {
-		t.Fatalf("decode %s: %v", path, err)
-	}
-	return ruleset
-}
-
-func assertSharedRuleset(t *testing.T, ruleset importableRuleset, name string, ref string, mergeMethods []string) {
-	t.Helper()
-	if ruleset.Name != name || ruleset.Target != "branch" || ruleset.Enforcement != "active" || len(ruleset.BypassActors) != 0 {
-		t.Fatalf("shared Ruleset boundary = %#v", ruleset)
-	}
-	if strings.Join(ruleset.Conditions.RefName.Include, ",") != ref {
-		t.Fatalf("shared Ruleset ref patterns = %#v, want %q", ruleset.Conditions.RefName.Include, ref)
-	}
-	assertRuleTypes(t, ruleset, "deletion", "non_fast_forward", "pull_request", "required_status_checks", "code_scanning")
-	assertNoRuleTypes(t, ruleset, "code_quality", "code_coverage")
-
-	var pullRequest struct {
-		RequiredApprovingReviewCount   int      `json:"required_approving_review_count"`
-		DismissStaleReviewsOnPush      bool     `json:"dismiss_stale_reviews_on_push"`
-		RequireLastPushApproval        bool     `json:"require_last_push_approval"`
-		RequiredReviewThreadResolution bool     `json:"required_review_thread_resolution"`
-		AllowedMergeMethods            []string `json:"allowed_merge_methods"`
-	}
-	decodeRuleParameters(t, ruleset, "pull_request", &pullRequest)
-	if pullRequest.RequiredApprovingReviewCount != 1 || !pullRequest.DismissStaleReviewsOnPush || pullRequest.RequireLastPushApproval || !pullRequest.RequiredReviewThreadResolution || strings.Join(pullRequest.AllowedMergeMethods, ",") != strings.Join(mergeMethods, ",") {
-		t.Fatalf("pull request parameters = %#v", pullRequest)
-	}
-
-	var statusChecks struct {
-		StrictRequiredStatusChecksPolicy bool `json:"strict_required_status_checks_policy"`
-		RequiredStatusChecks             []struct {
-			Context string `json:"context"`
-		} `json:"required_status_checks"`
-	}
-	decodeRuleParameters(t, ruleset, "required_status_checks", &statusChecks)
-	if !statusChecks.StrictRequiredStatusChecksPolicy {
-		t.Fatal("strict required status checks = false")
-	}
-	contexts := make([]string, 0, len(statusChecks.RequiredStatusChecks))
-	for _, check := range statusChecks.RequiredStatusChecks {
-		contexts = append(contexts, check.Context)
-	}
-	if strings.Join(contexts, ",") != "Quality gates (linux-amd64),Dependency admission review" {
-		t.Fatalf("required status contexts = %#v", contexts)
-	}
-
-	var codeScanning struct {
-		Tools []struct {
-			Tool                    string `json:"tool"`
-			AlertsThreshold         string `json:"alerts_threshold"`
-			SecurityAlertsThreshold string `json:"security_alerts_threshold"`
-		} `json:"code_scanning_tools"`
-	}
-	decodeRuleParameters(t, ruleset, "code_scanning", &codeScanning)
-	if len(codeScanning.Tools) != 1 || codeScanning.Tools[0].Tool != "CodeQL" || codeScanning.Tools[0].AlertsThreshold != "all" || codeScanning.Tools[0].SecurityAlertsThreshold != "all" {
-		t.Fatalf("code scanning parameters = %#v", codeScanning)
-	}
-}
-
-func assertRuleTypes(t *testing.T, ruleset importableRuleset, want ...string) {
-	t.Helper()
-	got := make([]string, 0, len(ruleset.Rules))
-	for _, rule := range ruleset.Rules {
-		got = append(got, rule.Type)
-	}
-	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Fatalf("Ruleset rule types = %#v, want %#v", got, want)
-	}
-}
-
-func containsRule(ruleset importableRuleset, ruleType string) bool {
-	for _, rule := range ruleset.Rules {
-		if rule.Type == ruleType {
-			return true
-		}
-	}
-	return false
-}
-
-func assertNoRuleTypes(t *testing.T, ruleset importableRuleset, forbidden ...string) {
-	t.Helper()
-	for _, ruleType := range forbidden {
-		if containsRule(ruleset, ruleType) {
-			t.Fatalf("Ruleset contains forbidden rule type %q", ruleType)
-		}
-	}
-}
-
-func decodeRuleParameters(t *testing.T, ruleset importableRuleset, ruleType string, target any) {
-	t.Helper()
-	for _, rule := range ruleset.Rules {
-		if rule.Type != ruleType {
-			continue
-		}
-		if err := json.Unmarshal(rule.Parameters, target); err != nil {
-			t.Fatalf("decode %s parameters: %v", ruleType, err)
-		}
-		return
-	}
-	t.Fatalf("missing %s rule", ruleType)
-}
-
 func assertWorkflowContract(t *testing.T, path string, required []string) {
 	t.Helper()
 	contents := readRepositoryFile(t, path)
@@ -473,10 +243,6 @@ func assertRepositoryFileDoesNotContain(t *testing.T, path string, forbidden []s
 			t.Fatalf("%s contains forbidden value %q", path, value)
 		}
 	}
-}
-
-func normalizeWhitespace(content string) string {
-	return strings.Join(strings.Fields(content), " ")
 }
 
 func readRepositoryFile(t *testing.T, path string) string {
