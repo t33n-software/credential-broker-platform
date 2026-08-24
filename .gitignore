@@ -1,13 +1,20 @@
+# Local build and test outputs.
+/.build/
+/dist/
+/coverage/
+/.cache/
+*.coverprofile
+*.test
+*.out
+*.cov
+
+# -- project additions below this line --
 .env
 .env.*
 *.pem
 *.key
 *.crt
-coverage.out
-coverage.xml
 bin/
-.build/
-dist/
-*.out
 coverage
+coverage.xml
 coverage.html
