@@ -153,6 +153,22 @@ func TestRun(t *testing.T) {
 	}
 }
 
+func TestRunPrintsVersion(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), []string{"--version"}, &stdout, &stderr,
+		func(context.Context, []string, string, ...string) ([]byte, error) { return nil, nil },
+		func(string) ([]string, error) { return nil, nil },
+		func(string) ([]byte, error) { return nil, nil },
+		func(source []byte) ([]byte, error) { return source, nil },
+		func(string, os.FileMode) error { return nil })
+	if code != 0 {
+		t.Fatalf("run() = %d, want 0", code)
+	}
+	if stdout.String() != "build devel\n" {
+		t.Fatalf("stdout = %q, want version output", stdout.String())
+	}
+}
+
 func TestRunUsesBackgroundContextAndLinuxTarget(t *testing.T) {
 	var (
 		receivedContext context.Context

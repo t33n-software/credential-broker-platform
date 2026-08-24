@@ -25,6 +25,12 @@ func TestRun(t *testing.T) {
 			wantStderr: "usage: check-coverage\n",
 		},
 		{
+			name:       "version surface",
+			arguments:  []string{"--version"},
+			wantCode:   0,
+			wantStdout: "check-coverage devel\n",
+		},
+		{
 			name:       "command failure",
 			output:     "partial output",
 			err:        errors.New("failed"),
