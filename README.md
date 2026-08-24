@@ -98,6 +98,15 @@ The Go toolchain is pinned exactly (`toolchain go1.26.6`,
 live in the pinned `tools/` module. CI re-runs the full gate daily so newly
 disclosed vulnerabilities fail closed even without source changes.
 
+In CI the repository is a tenant of the canonical repo surface: the three
+shared-line workflows (`ci.yml`, `codeql.yml`, `dependency-review.yml`) are
+byte-identical callers of the repository-governance home, and the canonical
+quality gate of the go-quality-authority territory home runs through the
+tooling module. The `repo-bindings.json` manifest binds the adoption (home
+pin, fleet classes, caller and file hashes, config-seam and tool-catalog
+versions), and the `Canonical conformance` check re-proves it fail-closed on
+every shared-line change.
+
 ## GitHub governance
 
 Branch governance is bound through the organization-level rule-sets; the
