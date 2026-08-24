@@ -37,21 +37,29 @@ never join the source module graph. CI re-runs the full gate on a daily
 schedule so newly disclosed vulnerabilities in the pinned toolchain or
 dependency graph fail closed even without source changes. Lefthook provides
 the local `commit-msg` hook (governed commit-message validation) and the
-pre-push source-quality gate.
+pre-push validation through `git-governance --interactive never validate
+pre-push`.
 
 Local verification must not use production GitHub App private keys, Cloud Run
 invoker identities, deployment credentials, or a mutable production service.
 
 ## CI source-quality verification
 
-The required CI check is:
-
-```text
-Quality gates (linux-amd64)
-```
-
-It additionally runs deterministic fuzz smoke tests for configuration and HTTP
-request boundaries, then verifies the Linux AMD64 platform binary.
+The shared-line workflows are the byte-identical canonical callers of the
+repository-governance home, pinned by full-length commit SHA: `ci.yml` runs
+the canonical quality gate of the go-quality-authority territory home (check
+context `Quality gates / linux-amd64`), `codeql.yml` runs the canonical
+CodeQL lane (check context `CodeQL / CodeQL (go)`, consumed by the
+code-scanning rule-set rule), and `dependency-review.yml` runs the dependency
+admission review (check context `Dependency review / Dependency admission
+review`). The callers trigger on push and pull request to every shared line
+(`main`, `develop`, `release/**`, `support/**`) plus a daily schedule and
+manual dispatch. The `canonical-conformance.yml` workflow runs the home's
+conformance verifier (check context `Canonical conformance`) against
+`repo-bindings.json`: caller hashes and pins, canonical file equality,
+CODEOWNERS materialization, config-seam conformance, tool-pin admission, and
+license-lane wiring. The organization rule-sets bind a check context only
+after the lane has proven it on a real pull request to the exact target line.
 
 ## External Fortress prerequisites
 

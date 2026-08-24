@@ -31,3 +31,22 @@ func TestMainLogsRuntimeFailure(t *testing.T) {
 	}
 	main()
 }
+
+func TestMainPrintsVersion(t *testing.T) {
+	originalRun := run
+	originalArgs := commandArgs
+	defer func() { run = originalRun; commandArgs = originalArgs }()
+
+	called := false
+	run = func(ctx context.Context, logger *slog.Logger) error {
+		called = true
+		return nil
+	}
+	commandArgs = []string{"broker", "--version"}
+
+	main()
+
+	if called {
+		t.Fatal("main() invoked the runtime for --version")
+	}
+}

@@ -1,5 +1,6 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
+  "toolchain": { "goVersion": "1.26.6" },
   "defaults": {
     "includeFamilies": [
       "feature",
@@ -23,5 +24,33 @@
       ],
       "timeout": "15m"
     }
-  ]
+  ],
+  "project": {
+    "binaries": [
+      {
+        "package": "./cmd/broker",
+        "smoke": ["--version"]
+      },
+      {
+        "package": "./cmd/build",
+        "smoke": ["--version"]
+      },
+      {
+        "package": "./cmd/check-coverage",
+        "smoke": ["--version"]
+      }
+    ],
+    "fuzz": [
+      {
+        "package": "./internal/config",
+        "target": "FuzzParseRepository",
+        "time": "50000x"
+      },
+      {
+        "package": "./internal/broker",
+        "target": "FuzzTokenRequestBoundary",
+        "time": "50000x"
+      }
+    ]
+  }
 }
