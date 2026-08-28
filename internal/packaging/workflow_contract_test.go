@@ -167,7 +167,12 @@ func TestWorkflowsCarryNoTenantOrSecretValues(t *testing.T) {
 func TestQualityGateContract(t *testing.T) {
 	var quality struct {
 		SchemaVersion int `json:"schemaVersion"`
-		Gates         []struct {
+		Toolchain     struct {
+			Language string `json:"language"`
+			Version  string `json:"version"`
+		} `json:"toolchain"`
+		Extends []string `json:"extends"`
+		Gates   []struct {
 			Name    string   `json:"name"`
 			Command string   `json:"command"`
 			Args    []string `json:"args"`
@@ -176,8 +181,14 @@ func TestQualityGateContract(t *testing.T) {
 	if err := json.Unmarshal([]byte(readRepositoryFile(t, "git-governance.quality.json")), &quality); err != nil {
 		t.Fatalf("decode quality configuration: %v", err)
 	}
-	if quality.SchemaVersion != 3 {
-		t.Fatalf("schemaVersion = %d, want 3", quality.SchemaVersion)
+	if quality.SchemaVersion != 4 {
+		t.Fatalf("schemaVersion = %d, want 4", quality.SchemaVersion)
+	}
+	if quality.Toolchain.Language != "go" || quality.Toolchain.Version != "1.26.6" {
+		t.Fatalf("toolchain = %q@%q, want the language-keyed go@1.26.6 form", quality.Toolchain.Language, quality.Toolchain.Version)
+	}
+	if quality.Extends == nil || len(quality.Extends) != 0 {
+		t.Fatalf("extends = %v, want the explicit empty list", quality.Extends)
 	}
 
 	want := map[string]string{
