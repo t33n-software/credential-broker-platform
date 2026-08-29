@@ -172,7 +172,12 @@ func TestQualityGateContract(t *testing.T) {
 			Version  string `json:"version"`
 		} `json:"toolchain"`
 		Extends []string `json:"extends"`
-		Gates   []struct {
+		Project struct {
+			Binaries []struct {
+				Package string `json:"package"`
+			} `json:"binaries"`
+		} `json:"project"`
+		Gates []struct {
 			Name    string   `json:"name"`
 			Command string   `json:"command"`
 			Args    []string `json:"args"`
@@ -192,7 +197,7 @@ func TestQualityGateContract(t *testing.T) {
 	}
 
 	want := map[string]string{
-		"platform-source-quality": "go run -mod=readonly ./cmd/build",
+		"platform-source-quality": "go tool -modfile tools/go.mod quality-gate",
 	}
 	if len(quality.Gates) != len(want) {
 		t.Fatalf("gate count = %d, want %d", len(quality.Gates), len(want))
@@ -206,6 +211,21 @@ func TestQualityGateContract(t *testing.T) {
 	}
 	if len(want) != 0 {
 		t.Fatalf("missing required gates: %#v", want)
+	}
+
+	if len(quality.Project.Binaries) != 1 || quality.Project.Binaries[0].Package != "./cmd/broker" {
+		t.Fatal("the project binaries must carry only the broker")
+	}
+	raw := readRepositoryFile(t, "git-governance.quality.json")
+	for _, forbidden := range []string{`"./cmd/build"`, `"./cmd/check-coverage"`, `"defaults"`} {
+		if strings.Contains(raw, forbidden) {
+			t.Fatalf("git-governance.quality.json still contains %s", forbidden)
+		}
+	}
+	for _, chainCopy := range []string{"cmd/build", "cmd/check-coverage"} {
+		if _, err := os.Stat(filepath.Join("..", "..", filepath.FromSlash(chainCopy))); !os.IsNotExist(err) {
+			t.Fatalf("the repo-local gate chain copy %s must not exist", chainCopy)
+		}
 	}
 }
 
@@ -232,7 +252,7 @@ func TestLocalFortressContracts(t *testing.T) {
 		"*.crt",
 	})
 	assertWorkflowContract(t, "docs/development/VERIFICATION.md", []string{
-		"go run -mod=readonly ./cmd/build",
+		"go tool -modfile tools/go.mod quality-gate",
 		"approved internal Go proxy",
 		"evidence-verified internal Go 1.26.6 builder artifact",
 		"Tenant App keys",

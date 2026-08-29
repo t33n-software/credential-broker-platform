@@ -5,12 +5,12 @@
 Developers may run the platform source gate without tenant credentials:
 
 ```text
-go run -mod=readonly ./cmd/build
+go tool -modfile tools/go.mod quality-gate
 go test ./...
-go run ./cmd/check-coverage
+go tool -modfile tools/go.mod check-coverage
 ```
 
-The controlled build command verifies:
+The canonical gate chain verifies:
 
 ```text
 Go formatting
@@ -25,8 +25,7 @@ go vet
 govulncheck fail-closed vulnerability analysis
 configuration and HTTP boundary fuzz lanes
 Lefthook configuration validation
-Linux AMD64 broker build
-embedded module provenance
+native broker build and smoke test
 ```
 
 The Go toolchain is pinned exactly (`toolchain go1.26.6`,
