@@ -81,17 +81,18 @@ BROKER_MIN_TOKEN_LIFETIME    optional; default 2m
 ## Local verification
 
 ```powershell
-go run -mod=readonly ./cmd/build
+go tool -modfile tools/go.mod quality-gate
 go test -mod=readonly ./...
-go run -mod=readonly ./cmd/check-coverage
+go tool -modfile tools/go.mod check-coverage
 ```
 
-The build command enforces formatting, module integrity, read-only module
-metadata, the pinned build tool module, lint (staticcheck), tests, exact
-statement coverage, race detection, static analysis, fail-closed
+The canonical gate chain of the go-quality-authority territory home runs
+through the pinned tooling module and enforces formatting, module integrity,
+read-only module metadata, the pinned build tool module, lint (staticcheck),
+tests, exact statement coverage, race detection, static analysis, fail-closed
 vulnerability analysis (govulncheck), the configuration and HTTP boundary
-fuzz lanes, Lefthook configuration validation, Linux/AMD64 compilation, and
-embedded module provenance.
+fuzz lanes, Lefthook configuration validation, and the native broker build
+with its smoke test.
 
 The Go toolchain is pinned exactly (`toolchain go1.26.6`,
 `GOTOOLCHAIN=local`); no lane downloads a toolchain at build time. Build tools

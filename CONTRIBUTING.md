@@ -25,9 +25,9 @@ different platform key.
 Run after relevant Go changes:
 
 ```powershell
-go run -mod=readonly ./cmd/build
+go tool -modfile tools/go.mod quality-gate
 ```
 
-The controlled build verifies formatting, module integrity, read-only module
-metadata, tests, exact `100.0%` statement coverage, race detection, static
-analysis, Linux/AMD64 compilation, and embedded module provenance.
+The canonical gate chain verifies formatting, module integrity, read-only
+module metadata, tests, exact `100.0%` statement coverage, race detection,
+static analysis, and the native broker build with its smoke test.
