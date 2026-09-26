@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// bindingManifest mirrors the tenant binding manifest (repo-bindings/v1) for
+// bindingManifest mirrors the tenant binding manifest (repo-bindings/v2) for
 // the self-consistency proofs of the canonical adoption. The home-side proof
 // against the canonical masters is owned by the verify-canonical tool; these
 // tests bind the tenant files to the manifest.
@@ -25,10 +25,10 @@ type bindingManifest struct {
 		SHA256 string `json:"sha256"`
 	} `json:"callers"`
 	Files struct {
-		Lefthook      fileBinding `json:"lefthook"`
-		Gitattributes fileBinding `json:"gitattributes"`
-		Gitignore     fileBinding `json:"gitignore"`
-		Dependabot    fileBinding `json:"dependabot"`
+		Lefthook      fileBinding      `json:"lefthook"`
+		Gitattributes fileBinding      `json:"gitattributes"`
+		Gitignore     gitignoreBinding `json:"gitignore"`
+		Dependabot    fileBinding      `json:"dependabot"`
 	} `json:"files"`
 	Codeowners struct {
 		Path         string `json:"path"`
@@ -39,6 +39,15 @@ type bindingManifest struct {
 type fileBinding struct {
 	Path   string `json:"path"`
 	SHA256 string `json:"sha256"`
+}
+
+// gitignoreBinding mirrors the fragment-composition binding of the gitignore
+// topic: the ordered fragment list (the org core first) and the hash of the
+// rendered governed region.
+type gitignoreBinding struct {
+	Path      string   `json:"path"`
+	Fragments []string `json:"fragments"`
+	SHA256    string   `json:"sha256"`
 }
 
 func readBindingManifest(t *testing.T) bindingManifest {
@@ -108,16 +117,37 @@ func TestCanonicalFileFamilyMatchesTheBindingManifest(t *testing.T) {
 			t.Fatalf("the canonical file %s hashes to %s, want the bound %s", topic.Path, hash, topic.SHA256)
 		}
 	}
-	// The gitignore topic is prefix-mode in the home verifier: the canonical
-	// core is a verbatim prefix and project additions live below the mark.
+	// The gitignore topic is the fragment-composition form: the manifest binds
+	// the ordered fragment list (the org core first) and the hash of the
+	// rendered governed region, and the tenant file carries the generated
+	// header naming the fragments and the bound home pin, the governed region
+	// as a verbatim prefix, and exactly one project-block mark with the free
+	// project block below it. The home-side re-render proof against the pinned
+	// home tree is owned by the verify-canonical tool; these assertions bind
+	// the tenant file to the manifest.
 	gitignore := readRepositoryFile(t, manifest.Files.Gitignore.Path)
-	const canonicalGitignoreCore = "# Local build and test outputs.\n/.build/\n/dist/\n/coverage/\n/.cache/\n*.coverprofile\n*.test\n*.out\n*.cov\n\n# -- project additions below this line --\n"
-	if !strings.HasPrefix(gitignore, canonicalGitignoreCore) {
-		t.Fatal("the gitignore does not carry the canonical core as a verbatim prefix")
+	fragments := manifest.Files.Gitignore.Fragments
+	if len(fragments) != 2 || fragments[0] != "core" || fragments[1] != "go/core" {
+		t.Fatalf("the manifest binds the fragments %v, want [core go/core]", fragments)
+	}
+	header := "# canonical: gitignore " + strings.Join(fragments, " + ") + " @ " + manifest.Home.SHA + " — governed region, do not edit\n"
+	if !strings.HasPrefix(gitignore, header) {
+		t.Fatal("the gitignore does not carry the generated header naming the bound fragments and the home pin")
+	}
+	const projectBlockMark = "# -- project additions below this line --"
+	if strings.Count(gitignore, projectBlockMark) != 1 {
+		t.Fatal("the gitignore does not carry exactly one project-block mark")
+	}
+	region, _, found := strings.Cut(gitignore, projectBlockMark)
+	if !found {
+		t.Fatal("the gitignore does not carry the project-block mark")
+	}
+	if regionHash := sha256.Sum256([]byte(region + projectBlockMark + "\n")); hex.EncodeToString(regionHash[:]) != manifest.Files.Gitignore.SHA256 {
+		t.Fatal("the governed region of the gitignore diverges from the bound hash")
 	}
 	for _, addition := range []string{".env", "*.pem", "*.key", "*.crt"} {
 		if !strings.Contains(gitignore, addition) {
-			t.Fatalf("the gitignore does not preserve the credential file pattern %q below the mark", addition)
+			t.Fatalf("the gitignore does not preserve the credential file pattern %q", addition)
 		}
 	}
 
